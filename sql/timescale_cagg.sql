@@ -18,3 +18,24 @@ CALL refresh_continuous_aggregate(
     NULL,
     NULL
 );
+
+DROP MATERIALIZED VIEW IF EXISTS daily_warehouse_inventory_summary;
+
+CREATE MATERIALIZED VIEW daily_warehouse_inventory_summary
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('1 day', inventory_timestamp) AS day,
+    warehouse_id,
+    SUM(stock_quantity) AS total_stock,
+    AVG(stock_quantity) AS avg_stock,
+    COUNT(*) FILTER (WHERE stock_quantity < reorder_threshold) AS low_stock_events,
+    COUNT(*) FILTER (WHERE stock_quantity = 0) AS stockout_events
+FROM inventory_snapshots
+GROUP BY day, warehouse_id
+WITH NO DATA;
+
+CALL refresh_continuous_aggregate(
+    'daily_warehouse_inventory_summary',
+    NULL,
+    NULL
+);
